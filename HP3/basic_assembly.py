@@ -11,7 +11,6 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 K = 25
 
-
 def parse_reads_file(reads_fn):
     """
     :param reads_fn: the file containing all of the reads
@@ -48,6 +47,127 @@ def create_kmers(reads, k):
     for read in reads:
         kmers += create_kmer_from_read(read, k)
     return kmers
+
+def get_cycles(dic, cycles, start):
+	if dic == {}:
+		return {}, cycles, start
+	curr = start
+	c = []
+	next = None
+
+	while True:
+		c.append(curr)
+		if next not in out_deg.keys() or next not in in_deg.keys():	
+			if curr not in dic.keys():
+				return dic, [], start
+
+			next = dic[curr].pop(0)
+			curr = next
+		else:
+			break
+
+	cycles.append(c)
+
+	to_del = []
+	for k in dic.keys():
+		if dic[k]  == []:
+			to_del.append(k)
+	for k in to_del:
+		del dic[k]
+
+	if dic == {}:
+		return dic, cycles, start
+
+	for i in c:
+		if i in dic.keys():
+			dic, cycles, _ = get_cycles(dic, cycles, i)
+			if dic == {}:
+				return dic, cycles, start
+
+	return dic, cycles, start
+
+def get_maximal_path(path, cycle, rest):
+	if cycle == []:
+		return path, [], []
+
+	for c in cycle:
+		for r in rest:
+			if c == r[0]:
+				rest.remove(r)
+				path, _, rest = get_maximal_path(path, r, rest)
+		else:
+			path.append(c)
+
+	return path[:-1], [], rest
+
+def create_debruijn(kmers):
+    debruijn = {}
+    for kmer in kmers:
+        if kmer[:-1] not in debruijn:
+            debruijn[kmer[:-1]] = [kmer[1:]]
+        else:
+            debruijn[kmer[:-1]].append(kmer[1:])
+    return debruijn
+
+def generate_contigs(dic):    
+    global in_deg
+    global out_deg
+    in_deg = {}
+    out_deg = {}
+
+    for k in dic.keys():
+        out_deg[k] = len(dic[k])
+        for v in dic[k]:
+            if v not in in_deg.keys():
+                in_deg[v] = 1
+            else:
+                in_deg[v] += 1
+        
+    for k in dic.keys():
+        if k not in out_deg.keys():
+            out_deg[k] = 0
+        if k not in in_deg.keys():
+            in_deg[k] = 0
+
+        for v in dic[k]: 
+            if v not in out_deg.keys():
+                out_deg[v] = 0
+            if v not in in_deg.keys():
+                in_deg[v] = 0
+
+    remove = []
+    for k in in_deg.keys():
+        if in_deg[k] == out_deg[k] == 1:
+            remove.append(k)
+
+    for k in remove:
+        del in_deg[k]
+        del out_deg[k]
+
+    paths = []
+
+    start = None
+    for k in in_deg.keys():
+        start = k   
+        cycles = []
+        dic, cycles, _ = get_cycles(dic, cycles, start)
+        
+        if cycles == []:
+            continue
+
+        for c in cycles:
+            paths.append(c)
+    
+    return create_contigs_from_paths(paths)
+
+def create_contigs_from_paths(paths):
+    contigs = []
+    for path in paths:
+        ordered = path[0]
+        for i in range(1,len(path)):
+            ordered += path[i][-1]
+        contigs.append(ordered)
+    return contigs
 
 def expand_dict_to_list(dict, valid_keys = None):
     if valid_keys == None:
@@ -101,11 +221,11 @@ if __name__ == "__main__":
 
     single_reads = [read for read_pair in input_reads for read in read_pair]
 
-    kmers = remove_errors(create_kmers(single_reads[:5], K))
+    kmers = remove_errors(create_kmers(single_reads, K))
 
     # contigs = ['GCTGACTAGCTAGCTACGATCGATCGATCGATCGATCGATGACTAGCTAGCTAGCGCTGACT']
-
     contigs = kmers
+    print(len(kmers))
 
     output_fn = args.output_file
     zip_fn = output_fn + '.zip'
