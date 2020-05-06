@@ -223,9 +223,8 @@ if __name__ == "__main__":
 
     kmers = remove_errors(create_kmers(single_reads, K))
 
-    # contigs = ['GCTGACTAGCTAGCTACGATCGATCGATCGATCGATCGATGACTAGCTAGCTAGCGCTGACT']
-    contigs = kmers
-    print(len(kmers))
+    debruijn = create_debruijn(kmers)
+    contigs = generate_contigs(debruijn)
 
     output_fn = args.output_file
     zip_fn = output_fn + '.zip'
