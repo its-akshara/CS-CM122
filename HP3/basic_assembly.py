@@ -9,6 +9,8 @@ import argparse
 sys.path.insert(0, os.path.abspath(".."))
 sys.path.insert(0, os.path.abspath("../.."))
 
+K = 25
+
 
 def parse_reads_file(reads_fn):
     """
@@ -35,12 +37,46 @@ def parse_reads_file(reads_fn):
         print("Could not read file: ", reads_fn)
         return None
 
+def create_kmer_from_read(read, k):
+    kmers = []
+    for i in range(len(read) - (k - 1)):
+        kmers.append(read[i:(i + k)])
+    return kmers
 
-"""
-    TODO: Use this space to implement any additional functions you might need
+def create_kmers(reads, k):
+    kmers = []
+    for read in reads:
+        kmers += create_kmer_from_read(read, k)
+    return kmers
 
-"""
+def expand_dict_to_list(dict, valid_keys = None):
+    if valid_keys == None:
+        valid_keys = dict.keys()
+    result = []
+    for key in valid_keys:
+        for i in range(dict[key]):
+            result.append(key)
+    return result
 
+def reduce_to_number_edges(kmers_to_count, valid_kmers = None):
+    if valid_kmers == None:
+        valid_kmers = kmers_to_count.keys()
+    kmers_reduced = {}
+    for kmer in valid_kmers:
+        kmers_reduced[kmer] = round(kmers_to_count[kmer]/K)
+    return kmers_reduced
+
+def remove_errors(kmers):
+    kmers_to_count = {}
+    for kmer in kmers:
+        if kmer in kmers_to_count:
+            kmers_to_count[kmer] += 1
+        else:
+            kmers_to_count[kmer] = 1
+
+    valid_kmers = [kmer for kmer in kmers_to_count.keys() if kmers_to_count[kmer] < K/5]
+    valid_kmers = reduce_to_number_edges(kmers_to_count, valid_kmers)
+    return expand_dict_to_list(kmers_to_count, valid_kmers)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='basic_assembly.py takes in data for homework assignment 3 consisting '
@@ -63,12 +99,13 @@ if __name__ == "__main__":
     if input_reads is None:
         sys.exit(1)
 
-    """
-            TODO: Call functions to do the actual assembly here
+    single_reads = [read for read_pair in input_reads for read in read_pair]
 
-    """
+    kmers = remove_errors(create_kmers(single_reads[:5], K))
 
-    contigs = ['GCTGACTAGCTAGCTACGATCGATCGATCGATCGATCGATGACTAGCTAGCTAGCGCTGACT']
+    # contigs = ['GCTGACTAGCTAGCTACGATCGATCGATCGATCGATCGATGACTAGCTAGCTAGCGCTGACT']
+
+    contigs = kmers
 
     output_fn = args.output_file
     zip_fn = output_fn + '.zip'
