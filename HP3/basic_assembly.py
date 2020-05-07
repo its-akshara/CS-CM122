@@ -89,20 +89,6 @@ def get_cycles(debruijn_left, cycles, start):
 
 	return debruijn_left, cycles, start
 
-def get_maximal_path(path, cycle, rest):
-	if cycle == []:
-		return path, [], []
-
-	for c in cycle:
-		for r in rest:
-			if c == r[0]:
-				rest.remove(r)
-				path, _, rest = get_maximal_path(path, r, rest)
-		else:
-			path.append(c)
-
-	return path[:-1], [], rest
-
 def create_debruijn(kmers):
     debruijn = {}
     for kmer in kmers:
