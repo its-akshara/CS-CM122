@@ -186,9 +186,18 @@ def expand_dict_to_list(dict):
 def reduce_to_number_edges(kmers_to_count):
     kmers_reduced = {}
     for kmer in kmers_to_count:
-        occurences = round(kmers_to_count[kmer]/30)
-        if occurences > 0:
-            kmers_reduced[kmer] = occurences
+        # if kmers_to_count[kmer] >= 30 and kmers_to_count[kmer] < 60:
+        #     kmers_reduced[kmer] = 1
+        # elif kmers_to_count[kmer] < 90:
+        #     kmers_reduced[kmer] = 2
+        # else:
+        #     print("A lot: {}".format(kmers_to_count[kmer]))
+        #     kmers_reduced[kmer] = 3
+        # occurences = int(kmers_to_count[kmer]/30)
+        # if occurences > 0:
+            # kmers_reduced[kmer] = occurences
+        if kmers_to_count[kmer] > 3:
+            kmers_reduced[kmer] = 1
     print("reduced len = {}".format(len(kmers_reduced)))
     return kmers_reduced
 
