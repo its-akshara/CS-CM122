@@ -48,43 +48,46 @@ def create_kmers(reads, k):
         kmers += create_kmer_from_read(read, k)
     return kmers
 
-def get_cycles(dic, cycles, start):
-	if dic == {}:
+def delete_dead_debruijn_nodes(debruijn):
+    delete_queue = []
+    for node in debruijn:
+        if len(debruijn[node]) == 0:
+            delete_queue.append(node)
+    for node in delete_queue:
+        del debruijn[node]
+    return debruijn
+
+def get_cycles(debruijn_left, cycles, start):
+	if debruijn_left == {}:
 		return {}, cycles, start
 	curr = start
-	c = []
+	cycle = []
 	next = None
 
 	while True:
-		c.append(curr)
-		if next not in out_deg.keys() or next not in in_deg.keys():	
-			if curr not in dic.keys():
-				return dic, [], start
+		cycle.append(curr)
+		if next not in out_deg or next not in in_deg:	
+			if curr not in debruijn_left:
+				return debruijn_left, [], start
 
-			next = dic[curr].pop(0)
+			next = debruijn_left[curr].pop(0)
 			curr = next
 		else:
 			break
+	cycles.append(cycle)
 
-	cycles.append(c)
+	debruijn_left = delete_dead_debruijn_nodes(debruijn_left)
 
-	to_del = []
-	for k in dic.keys():
-		if dic[k]  == []:
-			to_del.append(k)
-	for k in to_del:
-		del dic[k]
+	if debruijn_left == {}:
+		return debruijn_left, cycles, start
 
-	if dic == {}:
-		return dic, cycles, start
+	for node in cycle:
+		if node in debruijn_left:
+			debruijn_left, cycles, _ = get_cycles(debruijn_left, cycles, node)
+			if debruijn_left == {}:
+				return debruijn_left, cycles, start
 
-	for i in c:
-		if i in dic.keys():
-			dic, cycles, _ = get_cycles(dic, cycles, i)
-			if dic == {}:
-				return dic, cycles, start
-
-	return dic, cycles, start
+	return debruijn_left, cycles, start
 
 def get_maximal_path(path, cycle, rest):
 	if cycle == []:
@@ -101,49 +104,45 @@ def get_maximal_path(path, cycle, rest):
 	return path[:-1], [], rest
 
 def create_debruijn(kmers):
-    print(len(kmers))
     debruijn = {}
     for kmer in kmers:
         if kmer[:len(kmer)-1] not in debruijn:
             debruijn[kmer[:len(kmer)-1]] = [kmer[1:]]
         else:
             debruijn[kmer[:len(kmer)-1]].append(kmer[1:])
-
-    max = 0
-    for key in debruijn:
-        if len(debruijn[key]) > max:
-            max = len(debruijn[key])
-    print("max={}".format(max))
     return debruijn
 
-def generate_contigs(dic):    
+def calculate_degrees_debruijn(debruijn):
     global in_deg
     global out_deg
     in_deg = {}
     out_deg = {}
 
-    for k in dic.keys():
-        out_deg[k] = len(dic[k])
-        for v in dic[k]:
-            if v not in in_deg.keys():
-                in_deg[v] = 1
+    for node in debruijn:
+        out_deg[node] = len(debruijn[node])
+        for neighbor in debruijn[node]:
+            if neighbor not in in_deg:
+                in_deg[neighbor] = 1
             else:
-                in_deg[v] += 1
+                in_deg[neighbor] += 1
         
-    for k in dic.keys():
-        if k not in out_deg.keys():
-            out_deg[k] = 0
-        if k not in in_deg.keys():
-            in_deg[k] = 0
+    for node in debruijn:
+        if node not in out_deg:
+            out_deg[node] = 0
+        if node not in in_deg:
+            in_deg[node] = 0
 
-        for v in dic[k]: 
-            if v not in out_deg.keys():
-                out_deg[v] = 0
-            if v not in in_deg.keys():
-                in_deg[v] = 0
+        for neighbor in debruijn[node]: 
+            if neighbor not in out_deg:
+                out_deg[neighbor] = 0
+            if neighbor not in in_deg:
+                in_deg[neighbor] = 0
+
+def generate_contigs(debruijn):    
+    calculate_degrees_debruijn(debruijn)
 
     remove = []
-    for k in in_deg.keys():
+    for k in in_deg:
         if in_deg[k] == out_deg[k] == 1:
             remove.append(k)
 
@@ -153,17 +152,12 @@ def generate_contigs(dic):
 
     paths = []
 
-    start = None
-    for k in in_deg.keys():
-        start = k   
+    for start_node in in_deg: 
         cycles = []
-        dic, cycles, _ = get_cycles(dic, cycles, start)
-        
-        if cycles == []:
-            continue
+        debruijn, cycles, _ = get_cycles(debruijn, cycles, start_node)
 
-        for c in cycles:
-            paths.append(c)
+        for cycle in cycles:
+            paths.append(cycle)
     
     return create_contigs_from_paths(paths)
 
@@ -186,19 +180,8 @@ def expand_dict_to_list(dict):
 def reduce_to_number_edges(kmers_to_count):
     kmers_reduced = {}
     for kmer in kmers_to_count:
-        # if kmers_to_count[kmer] >= 30 and kmers_to_count[kmer] < 60:
-        #     kmers_reduced[kmer] = 1
-        # elif kmers_to_count[kmer] < 90:
-        #     kmers_reduced[kmer] = 2
-        # else:
-        #     print("A lot: {}".format(kmers_to_count[kmer]))
-        #     kmers_reduced[kmer] = 3
-        # occurences = int(kmers_to_count[kmer]/30)
-        # if occurences > 0:
-            # kmers_reduced[kmer] = occurences
         if kmers_to_count[kmer] > 3:
             kmers_reduced[kmer] = 1
-    print("reduced len = {}".format(len(kmers_reduced)))
     return kmers_reduced
 
 def create_kmers_to_count(kmers):
@@ -208,7 +191,6 @@ def create_kmers_to_count(kmers):
             kmers_to_count[kmer] += 1
         else:
             kmers_to_count[kmer] = 1
-    print("count len = {}".format(len(kmers_to_count)))
     return kmers_to_count
 
 def remove_errors(kmers):
