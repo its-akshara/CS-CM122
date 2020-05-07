@@ -101,12 +101,19 @@ def get_maximal_path(path, cycle, rest):
 	return path[:-1], [], rest
 
 def create_debruijn(kmers):
+    print(len(kmers))
     debruijn = {}
     for kmer in kmers:
-        if kmer[:-1] not in debruijn:
-            debruijn[kmer[:-1]] = [kmer[1:]]
+        if kmer[:len(kmer)-1] not in debruijn:
+            debruijn[kmer[:len(kmer)-1]] = [kmer[1:]]
         else:
-            debruijn[kmer[:-1]].append(kmer[1:])
+            debruijn[kmer[:len(kmer)-1]].append(kmer[1:])
+
+    max = 0
+    for key in debruijn:
+        if len(debruijn[key]) > max:
+            max = len(debruijn[key])
+    print("max={}".format(max))
     return debruijn
 
 def generate_contigs(dic):    
@@ -169,34 +176,37 @@ def create_contigs_from_paths(paths):
         contigs.append(ordered)
     return contigs
 
-def expand_dict_to_list(dict, valid_keys = None):
-    if valid_keys == None:
-        valid_keys = dict.keys()
+def expand_dict_to_list(dict):
     result = []
-    for key in valid_keys:
+    for key in dict:
         for i in range(dict[key]):
             result.append(key)
     return result
 
-def reduce_to_number_edges(kmers_to_count, valid_kmers = None):
-    if valid_kmers == None:
-        valid_kmers = kmers_to_count.keys()
+def reduce_to_number_edges(kmers_to_count):
     kmers_reduced = {}
-    for kmer in valid_kmers:
-        kmers_reduced[kmer] = round(kmers_to_count[kmer]/K)
+    for kmer in kmers_to_count:
+        occurences = round(kmers_to_count[kmer]/30)
+        if occurences > 0:
+            kmers_reduced[kmer] = occurences
+    print("reduced len = {}".format(len(kmers_reduced)))
     return kmers_reduced
 
-def remove_errors(kmers):
+def create_kmers_to_count(kmers):
     kmers_to_count = {}
     for kmer in kmers:
         if kmer in kmers_to_count:
             kmers_to_count[kmer] += 1
         else:
             kmers_to_count[kmer] = 1
+    print("count len = {}".format(len(kmers_to_count)))
+    return kmers_to_count
 
-    valid_kmers = [kmer for kmer in kmers_to_count.keys() if kmers_to_count[kmer] < K/5]
-    valid_kmers = reduce_to_number_edges(kmers_to_count, valid_kmers)
-    return expand_dict_to_list(kmers_to_count, valid_kmers)
+def remove_errors(kmers):
+    kmers_to_count = create_kmers_to_count(kmers)
+
+    valid_kmers = reduce_to_number_edges(kmers_to_count)
+    return expand_dict_to_list(valid_kmers)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='basic_assembly.py takes in data for homework assignment 3 consisting '
@@ -222,7 +232,6 @@ if __name__ == "__main__":
     single_reads = [read for read_pair in input_reads for read in read_pair]
 
     kmers = remove_errors(create_kmers(single_reads, K))
-
     debruijn = create_debruijn(kmers)
     contigs = generate_contigs(debruijn)
 
