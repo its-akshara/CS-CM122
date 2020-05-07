@@ -3,6 +3,7 @@ import argparse
 import time
 import zipfile
 
+L = 10
 
 def parse_reads_file(reads_fn):
     """
@@ -50,11 +51,15 @@ def parse_ref_file(ref_fn):
         print("Could not read file: ", ref_fn)
         return None
 
-
-"""
-    TODO: Use this space to implement any additional functions you might need
-
-"""
+def create_subsequence_lookup(genome):
+    subseq_to_index = {}
+    for i in range(len(genome) - L + 1):
+        seq = genome[i:i+L]
+        if seq in subseq_to_index:
+            subseq_to_index[seq].append(i)
+        else:
+            subseq_to_index[seq] = [i]
+    return subseq_to_index
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='basic_aligner.py takes in data for homework assignment 1 consisting '
@@ -82,10 +87,7 @@ if __name__ == "__main__":
     if reference is None:
         sys.exit(1)
 
-    """
-        TODO: Call functions to do the actual read alignment here
-        
-    """
+    print(create_subsequence_lookup("AAAAAAAAAAAAAAAAAAAA"))
     snps = [['A', 'G', 3425]]
 
     output_fn = args.output_file
