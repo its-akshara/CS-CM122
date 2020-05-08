@@ -3,7 +3,9 @@ import argparse
 import time
 import zipfile
 
-L = 10
+L = 30
+MISMATCHES_ALLOWED = 4 # Number of mismatches allowed
+CONSENSUS_MAJORITY = 20 # Number to get consensus that SNP located there
 
 def parse_reads_file(reads_fn):
     """
@@ -53,13 +55,79 @@ def parse_ref_file(ref_fn):
 
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
-    for i in range(len(genome) - L + 1):
+    for i in range(int(len(genome) - L/3 + 1)):
         seq = genome[i:i+L]
         if seq in subseq_to_index:
             subseq_to_index[seq].append(i)
         else:
             subseq_to_index[seq] = [i]
     return subseq_to_index
+
+def split_into_3(read):
+    return ([read[i:(i + L/3)] for i in range(0, len(read), int(L/3))])
+
+def find_pos_differences(ref, read, start_pos):
+    diff = []
+    for i in range(len(read)):
+        if read[i] != ref[start_pos + i]:
+            diff.append([ref[start_pos + i], read[i] , start_pos+i])
+    return diff
+
+def calculate_ref_read_position(which_third, index):
+    return index + which_third*L/3
+
+def evaluates_indices(indices, read, ref):
+    snps = []
+    # for index in indices:
+    #     ref_read = ref[index:(index+L)]
+    #     diff = find_pos_differences(ref_read, read, index)
+    #     if len(diff) < M:
+    #         snps += diff
+    return []
+
+# returns list of [OriginalAllele,SNP,Position]
+def find_possible_snp_in_read(read, lookup, ref):
+    possible_snps = find_pos_differences(ref, read, 0)
+    thirds = split_into_3(read)
+    which_third = 0
+    for third in thirds:
+        if third in lookup:
+            possible_indices = lookup[third]
+            possible_snps += evaluates_indices(possible_indices, read, ref)
+        which_third += 1
+    # for i in range(1, len(ref) - len(read) + 1):
+    #     diff = find_pos_differences(ref, read, i)
+    #     if len(diff) < MISMATCHES_ALLOWED and len(diff) < len(possible_snps): # choose best case match
+    #         possible_snps = diff
+    return possible_snps
+
+def count_occurences_possible_snps(snps):
+    snp_pos_to_count = {}
+    for snp_tuple in snps:
+        if snp_tuple in snp_pos_to_count:
+            snp_pos_to_count[snp_tuple] += 1
+        else:
+            snp_pos_to_count[snp_tuple] = 1
+    return snp_pos_to_count
+
+def choose_majority_snps(snp_possibilities_to_count):
+    snps = []
+    for snp_tuple in snp_possibilities_to_count:
+        if snp_possibilities_to_count[snp_tuple] > CONSENSUS_MAJORITY:
+            snps.append(snp_tuple)
+    return snps
+
+def find_snps(reads, lookup, ref):
+    possible_snps = []
+    snps = []
+    for read in reads:
+        possible_snps += find_possible_snp_in_read(read, lookup, ref)
+
+    snp_possibilities_to_count = count_occurences_possible_snps(possible_snps)
+
+    snps = choose_majority_snps(snp_possibilities_to_count)
+
+    return snps
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='basic_aligner.py takes in data for homework assignment 1 consisting '
@@ -87,8 +155,11 @@ if __name__ == "__main__":
     if reference is None:
         sys.exit(1)
 
-    print(create_subsequence_lookup("AAAAAAAAAAAAAAAAAAAA"))
-    snps = [['A', 'G', 3425]]
+    lookup = create_subsequence_lookup(reference)
+    reads = [read for read_pair in input_reads for read in read_pair]
+    snps = find_snps(reads, lookup, reference)
+
+    # snps = [['A', 'G', 3425]]
 
     output_fn = args.output_file
     zip_fn = output_fn + '.zip'
