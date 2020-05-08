@@ -5,7 +5,7 @@ import zipfile
 
 L = 30
 MISMATCHES_ALLOWED = 4 # Number of mismatches allowed
-CONSENSUS_MAJORITY = 20 # Number to get consensus that SNP located there
+CONSENSUS_MAJORITY = 10 # Number to get consensus that SNP located there
 
 def parse_reads_file(reads_fn):
     """
@@ -56,7 +56,7 @@ def parse_ref_file(ref_fn):
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
     for i in range(int(len(genome) - L/3 + 1)):
-        seq = genome[i:i+L]
+        seq = genome[i:int(i+L/3)]
         if seq in subseq_to_index:
             subseq_to_index[seq].append(i)
         else:
@@ -86,16 +86,21 @@ def find_pos_differences(ref, read, start_pos):
 def calculate_ref_read_position(which_third, index):
     return int(index + which_third*L/3)
 
-def evaluates_indices(indices, read, ref, which_third):
-    ref_read = ref[indices[0]:(indices[0+L])]
-    snps = find_pos_differences(ref_read, read, ref_start_pos(indices[0], which_third))
+def valid_index(index, ref_len):
+    return index >= 0 and ref_len > (index + L)
 
-    for i in range(1, len(indices)):
+def evaluates_indices(indices, read, ref, which_third):
+    max_len = 10000000
+    snps = []
+
+    for i in range(len(indices)):
         ref_read = ref[indices[i]:(indices[i]+L)]
-        print("ref_read at index {}: {}".format(indices[i],ref_read))
-        diff = find_pos_differences(ref_read, read, ref_start_pos(indices[i], which_third))
-        if len(diff) < MISMATCHES_ALLOWED and len(snps) > len(diff):
-            snps = diff
+        if valid_index(indices[i], len(ref_read)):
+            print("ref_read at index {}: {}".format(indices[i],ref_read))
+            diff = find_pos_differences(ref_read, read, ref_start_pos(indices[i], which_third))
+            if len(diff) < MISMATCHES_ALLOWED and max_len > len(diff):
+                snps = diff
+                max_len = len(snps)
     
     if len(snps) > MISMATCHES_ALLOWED:
         return []
@@ -113,7 +118,7 @@ def find_possible_snp_in_read(read, lookup, ref):
         if third in lookup:
             possible_indices = lookup[third]
             snps_for_third = (evaluates_indices(possible_indices, read, ref, which_third))
-            print(snps_for_third)
+            print("diffs in the read for this third:{}".format(snps_for_third))
             if len(snps_for_third) < min_length:
                 possible_snps = snps_for_third
                 min_length = len(possible_snps)
@@ -187,7 +192,6 @@ if __name__ == "__main__":
     reads = [read for read_pair in input_reads for read in read_pair]
     reduced_size_reads = reduce_reads_to_length_L(reads)
     snps = find_snps(reduced_size_reads, lookup, reference)
-
     # snps = [['A', 'G', 3425]]
 
     output_fn = args.output_file
