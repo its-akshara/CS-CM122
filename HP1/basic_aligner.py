@@ -64,7 +64,17 @@ def create_subsequence_lookup(genome):
     return subseq_to_index
 
 def split_into_3(read):
-    return ([read[i:(i + L/3)] for i in range(0, len(read), int(L/3))])
+    return ([read[i:int(i + L/3)] for i in range(0, len(read), int(L/3))])
+
+def ref_start_pos(index, which_third):
+    if which_third == 0:
+        return index
+    elif which_third == 1:
+        return index + L/3
+    else:
+        return index + L*2/3
+
+    return index
 
 def find_pos_differences(ref, read, start_pos):
     diff = []
@@ -74,53 +84,64 @@ def find_pos_differences(ref, read, start_pos):
     return diff
 
 def calculate_ref_read_position(which_third, index):
-    return index + which_third*L/3
+    return int(index + which_third*L/3)
 
-def evaluates_indices(indices, read, ref):
-    snps = []
-    # for index in indices:
-    #     ref_read = ref[index:(index+L)]
-    #     diff = find_pos_differences(ref_read, read, index)
-    #     if len(diff) < M:
-    #         snps += diff
-    return []
+def evaluates_indices(indices, read, ref, which_third):
+    ref_read = ref[indices[0]:(indices[0+L])]
+    snps = find_pos_differences(ref_read, read, ref_start_pos(indices[0], which_third))
+
+    for i in range(1, len(indices)):
+        ref_read = ref[indices[i]:(indices[i]+L)]
+        print("ref_read at index {}: {}".format(indices[i],ref_read))
+        diff = find_pos_differences(ref_read, read, ref_start_pos(indices[i], which_third))
+        if len(diff) < MISMATCHES_ALLOWED and len(snps) > len(diff):
+            snps = diff
+    
+    if len(snps) > MISMATCHES_ALLOWED:
+        return []
+    return snps
 
 # returns list of [OriginalAllele,SNP,Position]
 def find_possible_snp_in_read(read, lookup, ref):
-    possible_snps = find_pos_differences(ref, read, 0)
+    possible_snps = []
     thirds = split_into_3(read)
     which_third = 0
+    min_length = 10000000
+    
     for third in thirds:
+        print("third: " + third)
         if third in lookup:
             possible_indices = lookup[third]
-            possible_snps += evaluates_indices(possible_indices, read, ref)
+            snps_for_third = (evaluates_indices(possible_indices, read, ref, which_third))
+            print(snps_for_third)
+            if len(snps_for_third) < min_length:
+                possible_snps = snps_for_third
+                min_length = len(possible_snps)
         which_third += 1
-    # for i in range(1, len(ref) - len(read) + 1):
-    #     diff = find_pos_differences(ref, read, i)
-    #     if len(diff) < MISMATCHES_ALLOWED and len(diff) < len(possible_snps): # choose best case match
-    #         possible_snps = diff
+    
     return possible_snps
 
 def count_occurences_possible_snps(snps):
     snp_pos_to_count = {}
     for snp_tuple in snps:
-        if snp_tuple in snp_pos_to_count:
-            snp_pos_to_count[snp_tuple] += 1
+        if tuple(snp_tuple) in snp_pos_to_count:
+            snp_pos_to_count[tuple(snp_tuple)] += 1
         else:
-            snp_pos_to_count[snp_tuple] = 1
+            snp_pos_to_count[tuple(snp_tuple)] = 1
     return snp_pos_to_count
 
 def choose_majority_snps(snp_possibilities_to_count):
     snps = []
     for snp_tuple in snp_possibilities_to_count:
         if snp_possibilities_to_count[snp_tuple] > CONSENSUS_MAJORITY:
-            snps.append(snp_tuple)
+            snps.append(list(snp_tuple))
     return snps
 
 def find_snps(reads, lookup, ref):
     possible_snps = []
     snps = []
     for read in reads:
+        print("Read: " + read)
         possible_snps += find_possible_snp_in_read(read, lookup, ref)
 
     snp_possibilities_to_count = count_occurences_possible_snps(possible_snps)
@@ -128,6 +149,13 @@ def find_snps(reads, lookup, ref):
     snps = choose_majority_snps(snp_possibilities_to_count)
 
     return snps
+
+def reduce_reads_to_length_L(reads):
+    reduced = []
+    for read in reads:
+        parts = [read[i:int(i + L)] for i in range(0, len(read), int(L))]
+        reduced += [part for part in parts if len(part) == L]
+    return reduced
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='basic_aligner.py takes in data for homework assignment 1 consisting '
@@ -157,7 +185,8 @@ if __name__ == "__main__":
 
     lookup = create_subsequence_lookup(reference)
     reads = [read for read_pair in input_reads for read in read_pair]
-    snps = find_snps(reads, lookup, reference)
+    reduced_size_reads = reduce_reads_to_length_L(reads)
+    snps = find_snps(reduced_size_reads, lookup, reference)
 
     # snps = [['A', 'G', 3425]]
 
