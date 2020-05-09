@@ -67,14 +67,7 @@ def split_into_3(read):
     return ([read[i:int(i + L/3)] for i in range(0, len(read), int(L/3))])
 
 def ref_start_pos(index, which_third):
-    if which_third == 0:
-        return index
-    elif which_third == 1:
-        return int(index + L/3)
-    else:
-        return int(index + L*2/3)
-
-    return index
+    return int(index + L * which_third/3)
 
 def find_pos_differences(ref, read, start_pos):
     diff = []
@@ -82,9 +75,6 @@ def find_pos_differences(ref, read, start_pos):
         if read[i] != ref[i]:
             diff.append([ref[i], read[i] , start_pos+i])
     return diff
-
-def calculate_ref_read_position(which_third, index):
-    return int(index + which_third*L/3)
 
 def valid_index(ref_len):
     return ref_len == L
@@ -96,23 +86,12 @@ def evaluates_indices(indices, read, ref, which_third):
     for i in range(len(indices)):
         ref_start = ref_start_pos(indices[i], which_third)
         ref_subseq = ref[ref_start:(ref_start+L)]
-        print("ref_subseq len: {}".format(len(ref_subseq)))
         if valid_index(len(ref_subseq)):
-            diff = find_pos_differences(ref_subseq, read, ref_start) #ref_start_pos(indices[i], which_third)
-            if len(diff) == 0: # exact match
-                print("exact match")
-                return [] 
-            elif len(diff) < MISMATCHES_ALLOWED and min_len > len(diff):
+            diff = find_pos_differences(ref_subseq, read, ref_start) 
+            if len(diff) < MISMATCHES_ALLOWED and min_len > len(diff):
                 snps = diff
-                print("We found an SNP!")
                 min_len = len(snps)
-            else:
-                print("ref_read at index {}: {}".format(indices[i],ref_subseq))
-                print("This is compared to: " + read)
-                print("diff: {}".format(diff))
-    
-    if len(snps) > MISMATCHES_ALLOWED:
-        return []
+
     return snps
 
 # returns list of [OriginalAllele,SNP,Position]
@@ -123,16 +102,12 @@ def find_possible_snp_in_read(read, lookup, ref):
     min_length = 10000000
     
     for third in thirds:
-        print("third: " + third)
         if third in lookup:
             possible_indices = lookup[third]
             snps_for_third = (evaluates_indices(possible_indices, read, ref, which_third))
-            # print("diffs in the read for this third:{}".format(snps_for_third))
             if len(snps_for_third) < min_length:
                 possible_snps = snps_for_third
                 min_length = len(possible_snps)
-        # else:
-        #     print("third not found")
         which_third += 1
     
     return possible_snps
@@ -157,11 +132,9 @@ def find_snps(reads, lookup, ref):
     possible_snps = []
     snps = []
     for read in reads:
-        print("Read: " + read)
         possible_snps += find_possible_snp_in_read(read, lookup, ref)
 
     snp_possibilities_to_count = count_occurences_possible_snps(possible_snps)
-    print("# poss found = {}".format(len(possible_snps)))
     snps = choose_majority_snps(snp_possibilities_to_count)
 
     return snps
@@ -214,7 +187,6 @@ if __name__ == "__main__":
 
     lookup = create_subsequence_lookup(reference)
     reads = [read for read_pair in input_reads for read in read_pair]
-    # reduced_size_reads = reduce_reads_to_length_L(reads)
     reduced_size_reads = enumerate_reads(reads)
     snps = find_snps(reduced_size_reads, lookup, reference)
 
