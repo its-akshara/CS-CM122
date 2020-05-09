@@ -55,12 +55,14 @@ def parse_ref_file(ref_fn):
 
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
+
     for i in range(int(len(genome) - L/3 + 1)):
         seq = genome[i:int(i+L/3)]
         if seq in subseq_to_index:
             subseq_to_index[seq].append(i)
         else:
             subseq_to_index[seq] = [i]
+
     return subseq_to_index
 
 def split_into_3(read):
@@ -71,9 +73,11 @@ def ref_start_pos(index, which_third):
 
 def find_pos_differences(ref, read, start_pos):
     diff = []
+
     for i in range(len(read)):
         if read[i] != ref[i]:
             diff.append([ref[i], read[i] , start_pos+i])
+
     return diff
 
 def valid_index(ref_len):
@@ -86,8 +90,10 @@ def evaluates_indices(indices, read, ref, which_third):
     for i in range(len(indices)):
         ref_start = ref_start_pos(indices[i], which_third)
         ref_subseq = ref[ref_start:(ref_start+L)]
+
         if valid_index(len(ref_subseq)):
             diff = find_pos_differences(ref_subseq, read, ref_start) 
+
             if len(diff) < MISMATCHES_ALLOWED and min_len > len(diff):
                 snps = diff
                 min_len = len(snps)
@@ -105,20 +111,24 @@ def find_possible_snp_in_read(read, lookup, ref):
         if third in lookup:
             possible_indices = lookup[third]
             snps_for_third = (evaluates_indices(possible_indices, read, ref, which_third))
+
             if len(snps_for_third) < min_length:
                 possible_snps = snps_for_third
                 min_length = len(possible_snps)
+
         which_third += 1
     
     return possible_snps
 
 def count_occurences_possible_snps(snps):
     snp_pos_to_count = {}
+
     for snp_tuple in snps:
         if tuple(snp_tuple) in snp_pos_to_count:
             snp_pos_to_count[tuple(snp_tuple)] += 1
         else:
             snp_pos_to_count[tuple(snp_tuple)] = 1
+
     return snp_pos_to_count
 
 def choose_majority_snps(snp_possibilities_to_count):
@@ -131,6 +141,7 @@ def choose_majority_snps(snp_possibilities_to_count):
 def find_snps(reads, lookup, ref):
     possible_snps = []
     snps = []
+
     for read in reads:
         possible_snps += find_possible_snp_in_read(read, lookup, ref)
 
@@ -144,7 +155,6 @@ def kmer_comp(read):
     for i in range(int(len(read) - L + 1)):
         kmers.append(read[i:int(i+L)])
     return kmers
-        
 
 def enumerate_reads(reads):
     kmers = []
@@ -158,6 +168,9 @@ def reduce_reads_to_length_L(reads):
         parts = [read[i:int(i + L)] for i in range(0, len(read), int(L))]
         reduced += [part for part in parts if len(part) == L]
     return reduced
+
+def convert_pairs_to_reads(paired_reads):
+    return [read for read_pair in paired_reads for read in read_pair]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='basic_aligner.py takes in data for homework assignment 1 consisting '
@@ -186,7 +199,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     lookup = create_subsequence_lookup(reference)
-    reads = [read for read_pair in input_reads for read in read_pair]
+    reads = convert_pairs_to_reads(input_reads)
     reduced_size_reads = enumerate_reads(reads)
     snps = find_snps(reduced_size_reads, lookup, reference)
 
