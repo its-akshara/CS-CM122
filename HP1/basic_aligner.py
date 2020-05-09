@@ -217,7 +217,6 @@ if __name__ == "__main__":
     # reduced_size_reads = reduce_reads_to_length_L(reads)
     reduced_size_reads = enumerate_reads(reads)
     snps = find_snps(reduced_size_reads, lookup, reference)
-    # snps = [['A', 'G', 3425]]
 
     output_fn = args.output_file
     zip_fn = output_fn + '.zip'
