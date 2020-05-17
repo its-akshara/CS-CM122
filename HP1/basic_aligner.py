@@ -4,8 +4,8 @@ import time
 import zipfile
 
 L = 30
-MISMATCHES_ALLOWED = 4 # Number of mismatches allowed
-CONSENSUS_MAJORITY = 10 # Number to get consensus that SNP located there
+MISMATCHES_ALLOWED = 2 # Number of mismatches allowed
+CONSENSUS_MAJORITY = 50 # Number to get consensus that SNP located there
 
 def parse_reads_file(reads_fn):
     """
@@ -69,7 +69,12 @@ def split_into_3(read):
     return ([read[i:int(i + L/3)] for i in range(0, len(read), int(L/3))])
 
 def ref_start_pos(index, which_third):
-    return int(index + L * which_third/3)
+    if which_third == 0:
+        return index
+    elif which_third == 1:
+        return int(index - L/3)
+    else:
+        return int(index - (2*L)/3)
 
 def find_pos_differences(ref, read, start_pos):
     diff = []
@@ -80,9 +85,6 @@ def find_pos_differences(ref, read, start_pos):
 
     return diff
 
-def valid_index(ref_len):
-    return ref_len == L
-
 def evaluates_indices(indices, read, ref, which_third):
     min_len = 10000000
     snps = []
@@ -91,7 +93,7 @@ def evaluates_indices(indices, read, ref, which_third):
         ref_start = ref_start_pos(indices[i], which_third)
         ref_subseq = ref[ref_start:(ref_start+L)]
 
-        if valid_index(len(ref_subseq)):
+        if (len(ref_subseq)) == L:
             diff = find_pos_differences(ref_subseq, read, ref_start) 
 
             if len(diff) < MISMATCHES_ALLOWED and min_len > len(diff):
@@ -161,13 +163,6 @@ def enumerate_reads(reads):
     for read in reads:
         kmers += kmer_comp(read)
     return kmers
-
-def reduce_reads_to_length_L(reads):
-    reduced = []
-    for read in reads:
-        parts = [read[i:int(i + L)] for i in range(0, len(read), int(L))]
-        reduced += [part for part in parts if len(part) == L]
-    return reduced
 
 def convert_pairs_to_reads(paired_reads):
     return [read for read_pair in paired_reads for read in read_pair]
