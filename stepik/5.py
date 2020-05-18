@@ -38,9 +38,10 @@ def manhattan_tourist(n, m, down, right):
             s[i][j] = max(s[i-1][j] + down[i-1][j], s[i][j-1] + right[i][j-1])
     return s[n][m]
 
-def read_manhattan(path):
-    file = open(path, 'r')
-    n, m = int(file.read().split())
-    return n, m
+def read_manhattan(down_path, right_path):
+    down = np.loadtxt(down_path, dtype='i', delimiter=' ')
+    right = np.loadtxt(right_path, dtype='i', delimiter=' ')
+    return down, right
 
-read_manhattan("input.txt")
+down, right = read_manhattan("down.txt", "right.txt")
+print(manhattan_tourist(19,19,down,right))
