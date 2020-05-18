@@ -4,6 +4,124 @@ import numpy as np
 import time
 import zipfile
 
+L = 30
+MISMATCHES_ALLOWED = 2 # Number of mismatches allowed
+CONSENSUS_MAJORITY = 90 # Number to get consensus that SNP located there
+
+def create_subsequence_lookup(genome):
+    subseq_to_index = {}
+
+    for i in range(int(len(genome) - L/3 + 1)):
+        seq = genome[i:int(i+L/3)]
+        if seq in subseq_to_index:
+            subseq_to_index[seq].append(i)
+        else:
+            subseq_to_index[seq] = [i]
+
+    return subseq_to_index
+
+def split_into_3(read):
+    return ([read[i:int(i + L/3)] for i in range(0, len(read), int(L/3))])
+
+def ref_start_pos(index, which_third):
+    if which_third == 0:
+        return index
+    elif which_third == 1:
+        return int(index - L/3)
+    else:
+        return int(index - (2*L)/3)
+
+def find_pos_differences(ref, read, start_pos):
+    diff = []
+
+    for i in range(len(read)):
+        if read[i] != ref[i]:
+            diff.append([ref[i], read[i] , start_pos+i])
+
+    return diff
+
+def evaluates_indices(indices, read, ref, which_third):
+    min_len = 10000000
+    snps = []
+
+    for i in range(len(indices)):
+        ref_start = ref_start_pos(indices[i], which_third)
+        ref_subseq = ref[ref_start:(ref_start+L)]
+
+        if (len(ref_subseq)) == L:
+            diff = find_pos_differences(ref_subseq, read, ref_start) 
+
+            if len(diff) < MISMATCHES_ALLOWED and min_len > len(diff):
+                snps = diff
+                min_len = len(snps)
+
+    return snps
+
+# returns list of [OriginalAllele,SNP,Position]
+def find_possible_snp_in_read(read, lookup, ref):
+    possible_snps = []
+    thirds = split_into_3(read)
+    which_third = 0
+    min_length = 10000000
+    
+    for third in thirds:
+        if third in lookup:
+            possible_indices = lookup[third]
+            snps_for_third = (evaluates_indices(possible_indices, read, ref, which_third))
+
+            if len(snps_for_third) < min_length:
+                possible_snps = snps_for_third
+                min_length = len(possible_snps)
+
+        which_third += 1
+    
+    return possible_snps
+
+def count_occurences_possible_snps(snps):
+    snp_pos_to_count = {}
+
+    for snp_tuple in snps:
+        if tuple(snp_tuple) in snp_pos_to_count:
+            snp_pos_to_count[tuple(snp_tuple)] += 1
+        else:
+            snp_pos_to_count[tuple(snp_tuple)] = 1
+
+    return snp_pos_to_count
+
+def choose_majority_snps(snp_possibilities_to_count):
+    snps = []
+    for snp_tuple in snp_possibilities_to_count:
+        if snp_possibilities_to_count[snp_tuple] > CONSENSUS_MAJORITY:
+            snps.append(list(snp_tuple))
+    return snps
+
+def find_snps(reads, lookup, ref):
+    possible_snps = []
+    snps = []
+
+    for read in reads:
+        possible_snps += find_possible_snp_in_read(read, lookup, ref)
+
+    snp_possibilities_to_count = count_occurences_possible_snps(possible_snps)
+    snps = choose_majority_snps(snp_possibilities_to_count)
+
+    return snps
+
+def kmer_comp(read):
+    kmers = []
+    for i in range(int(len(read) - L + 1)):
+        kmers.append(read[i:int(i+L)])
+    return kmers
+
+def enumerate_reads(reads):
+    kmers = []
+    for read in reads:
+        kmers += kmer_comp(read)
+    return kmers
+
+def convert_pairs_to_reads(paired_reads):
+    return [read for read_pair in paired_reads for read in read_pair]
+
 
 def parse_reads_file(reads_fn):
     """
@@ -53,12 +171,6 @@ def parse_ref_file(ref_fn):
         print("Could not read file: ", ref_fn)
         return None
 
-
-"""
-    TODO: Use this space to implement any additional functions you might need
-
-"""
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='basic_hasher.py takes in data for homework assignment 2 consisting '
                                      'of a genome and a set of reads and aligns the reads to the reference genome, '
@@ -88,11 +200,10 @@ if __name__ == "__main__":
     if reference is None:
         sys.exit(1)
 
-    """
-        TODO: Call functions to do the actual read alignment here
-
-    """
-    snps = [['A', 'G', 3425]]
+    lookup = create_subsequence_lookup(reference)
+    reads = convert_pairs_to_reads(input_reads)
+    reduced_size_reads = enumerate_reads(reads)
+    snps = find_snps(reduced_size_reads, lookup, reference)
     insertions = [['ACGTA', 12434]]
     deletions = [['CACGG', 12]]
 
