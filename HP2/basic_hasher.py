@@ -5,7 +5,7 @@ import time
 import zipfile
 
 L = 30
-MISMATCHES_ALLOWED = 1 # Number of mismatches allowed
+MISMATCHES_ALLOWED = 2 # Number of mismatches allowed
 CONSENSUS_MAJORITY = 150 # Number to get consensus that SNP located there
 
 def create_subsequence_lookup(genome):
