@@ -41,7 +41,6 @@ def find_pos_differences(ref, read, start_pos):
     return diff
 
 def evaluates_indices(indices, read, ref, which_third):
-    min_len = 10000000
     snps = []
 
     for i in range(len(indices)):
@@ -51,9 +50,8 @@ def evaluates_indices(indices, read, ref, which_third):
         if (len(ref_subseq)) == L:
             diff = find_pos_differences(ref_subseq, read, ref_start) 
 
-            if len(diff) < MISMATCHES_ALLOWED and min_len > len(diff):
-                snps = diff
-                min_len = len(snps)
+            if len(diff) < MISMATCHES_ALLOWED and len(diff) > 0:
+                snps += diff
 
     return snps
 
@@ -62,16 +60,12 @@ def find_possible_snp_in_read(read, lookup, ref):
     possible_snps = []
     thirds = split_into_3(read)
     which_third = 0
-    min_length = 10000000
     
     for third in thirds:
         if third in lookup:
             possible_indices = lookup[third]
             snps_for_third = (evaluates_indices(possible_indices, read, ref, which_third))
-
-            if len(snps_for_third) < min_length:
-                possible_snps = snps_for_third
-                min_length = len(possible_snps)
+            possible_snps += snps_for_third
 
         which_third += 1
     
@@ -91,7 +85,7 @@ def count_occurences_possible_snps(snps):
 def choose_majority_snps(snp_possibilities_to_count):
     snps = []
     for snp_tuple in snp_possibilities_to_count:
-        if snp_possibilities_to_count[snp_tuple] > CONSENSUS_MAJORITY:
+        if snp_possibilities_to_count[snp_tuple] >= CONSENSUS_MAJORITY:
             snps.append(list(snp_tuple))
     return snps
 
