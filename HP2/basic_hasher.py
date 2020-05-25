@@ -6,7 +6,7 @@ import zipfile
 
 L = 30
 MISMATCHES_ALLOWED = 2 # Number of mismatches allowed
-CONSENSUS_MAJORITY = 150 # Number to get consensus that SNP located there
+CONSENSUS_MAJORITY = 170 # Number to get consensus that SNP located there
 
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
@@ -304,7 +304,8 @@ if __name__ == "__main__":
     # write_lookup(lookup)
     lookup = read_lookup()
     reads = convert_pairs_to_reads(input_reads)
-    reduced_size_reads = enumerate_reads(reads)
+    # reduced_size_reads = enumerate_reads(reads)
+    reduced_size_reads = reads
     # write_reads(reduced_size_reads)
     reduced_size_reads = read_reads()
     snps = find_snps(reduced_size_reads, lookup, reference)
