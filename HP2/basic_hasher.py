@@ -5,8 +5,8 @@ import time
 import zipfile
 
 L = 30
-MISMATCHES_ALLOWED = 2 # Number of mismatches allowed
-CONSENSUS_MAJORITY = 240 # Number to get consensus that SNP located there
+MISMATCHES_ALLOWED = 1 # Number of mismatches allowed
+CONSENSUS_MAJORITY = 175 # Number to get consensus that SNP located there
 
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
@@ -84,11 +84,14 @@ def count_occurences_possible_snps(snps):
 
 def choose_majority_snps(snp_possibilities_to_count):
     snps = []
+    avg = 0
     for snp_tuple in snp_possibilities_to_count:
+        avg += snp_possibilities_to_count[snp_tuple]
         if snp_possibilities_to_count[snp_tuple] >= CONSENSUS_MAJORITY:
             print(snp_possibilities_to_count[snp_tuple])
             snps.append(list(snp_tuple))
     # snps.sort(key= lambda x:(snp_possibilities_to_count[tuple(x)]))
+    print("AVG={}".format(avg/len(snp_possibilities_to_count.keys())))
     return snps
 
 def find_snps(reads, lookup, ref):
@@ -120,8 +123,14 @@ def enumerate_reads(reads):
 def convert_pairs_to_reads(paired_reads):
     return [read for read_pair in paired_reads for read in read_pair]
 
-def should_compare_positions(first, third, ideal):
-    return (third - first == (ideal + 1)) or (third - first == (ideal - 1))
+def is_possible_ins(first, third, ideal):
+    return (third - first == (ideal + 1))
+ 
+def is_possible_del(first, third, ideal):
+    return (third - first == (ideal - 1))
+
+INS = "INS"
+DEL = "DEL"
 
 def find_compare_positions(possible_first_pos, possible_third_pos):
     ideal_pos_diff = int(L*2/3)
@@ -133,21 +142,49 @@ def find_compare_positions(possible_first_pos, possible_third_pos):
         for j in range(len(possible_third_pos)):
             if possible_third_pos[j] - possible_first_pos[i] == ideal_pos_diff:
                 return []
-            elif should_compare_positions(possible_first_pos[i], possible_third_pos[j], ideal_pos_diff):
-                return [possible_first_pos[i] + int(L/3)]
+            elif is_possible_ins(possible_first_pos[i], possible_third_pos[j], ideal_pos_diff):
+                return [(possible_first_pos[i] + int(L/3), INS)]
+            elif is_possible_del(possible_first_pos[i], possible_third_pos[j], ideal_pos_diff):
+                return [(possible_first_pos[i] + int(L/3), DEL)]
         # first_pos += 1
         # third_pos += 1
     return compare_positions
 
+def compare_deletion(ref,read_third,start_pos):
+    deletion = []
+    num_compares = min(len(ref, read_third))
+    # for i in range(num_compares):
+    #     print("ji")
+    #     if ref
+    return deletion
+
+def compare_insertion(ref,read_third,start_pos):
+    return []
+
 def find_insertions_deletions_in_read(read, lookup, ref):
     thirds = split_into_3(read)
+    ins = []
     dels = []
+    compare_positions = []
     if thirds[0] in lookup and thirds[2] in lookup:
         possible_first_pos = lookup[thirds[0]]
         possible_third_pos = lookup[thirds[2]]
         compare_positions = find_compare_positions(possible_first_pos, possible_third_pos)
 
-    return dels
+    if len(compare_positions) > 0:
+        for position_tuple in compare_positions:
+            if position_tuple[1] == INS:
+                genome_to_compare = ref[position_tuple[0]:(position_tuple[0] + int(L/3) + 1)]
+                insertion = compare_insertion(genome_to_compare, thirds[1], position_tuple[0])
+                if len(insertion) > 0: 
+                    ins += (insertion)
+            else:
+                genome_to_compare = ref[position_tuple[0]:(position_tuple[0] + int(L/3) - 1)]
+                deletion = compare_deletion(genome_to_compare, thirds[1], position_tuple[0])
+                if len(deletion) > 0: 
+                    dels += deletion
+
+    return ins, dels
 
 def find_ins_dels(reads, lookup, ref):
     possible_ins = []
@@ -263,13 +300,13 @@ if __name__ == "__main__":
     if reference is None:
         sys.exit(1)
 
-    lookup = create_subsequence_lookup(reference)
+    # lookup = create_subsequence_lookup(reference)
     # write_lookup(lookup)
-    # lookup = read_lookup()
+    lookup = read_lookup()
     reads = convert_pairs_to_reads(input_reads)
     reduced_size_reads = enumerate_reads(reads)
     # write_reads(reduced_size_reads)
-    # reduced_size_reads = read_reads()
+    reduced_size_reads = read_reads()
     snps = find_snps(reduced_size_reads, lookup, reference)
     # write_snps(snps)
     insertions = [['A', 12434]]
