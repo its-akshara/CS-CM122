@@ -6,7 +6,7 @@ import zipfile
 
 L = 30
 MISMATCHES_ALLOWED = 1 # Number of mismatches allowed
-CONSENSUS_MAJORITY = 175 # Number to get consensus that SNP located there
+CONSENSUS_MAJORITY = 150 # Number to get consensus that SNP located there
 
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
@@ -86,12 +86,12 @@ def choose_majority_snps(snp_possibilities_to_count):
     snps = []
     avg = 0
     for snp_tuple in snp_possibilities_to_count:
-        avg += snp_possibilities_to_count[snp_tuple]
         if snp_possibilities_to_count[snp_tuple] >= CONSENSUS_MAJORITY:
             print(snp_possibilities_to_count[snp_tuple])
             snps.append(list(snp_tuple))
+            avg += snp_possibilities_to_count[snp_tuple]
     # snps.sort(key= lambda x:(snp_possibilities_to_count[tuple(x)]))
-    print("AVG={}".format(avg/len(snp_possibilities_to_count.keys())))
+    print("AVG={}".format(avg/len(snps)))
     return snps
 
 def find_snps(reads, lookup, ref):
