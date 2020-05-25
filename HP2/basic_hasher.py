@@ -6,7 +6,7 @@ import zipfile
 
 L = 30
 MISMATCHES_ALLOWED = 2 # Number of mismatches allowed
-CONSENSUS_MAJORITY = 90 # Number to get consensus that SNP located there
+CONSENSUS_MAJORITY = 240 # Number to get consensus that SNP located there
 
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
@@ -50,7 +50,7 @@ def evaluates_indices(indices, read, ref, which_third):
         if (len(ref_subseq)) == L:
             diff = find_pos_differences(ref_subseq, read, ref_start) 
 
-            if len(diff) < MISMATCHES_ALLOWED and len(diff) > 0:
+            if len(diff) <= MISMATCHES_ALLOWED and len(diff) > 0:
                 snps += diff
 
     return snps
@@ -86,7 +86,9 @@ def choose_majority_snps(snp_possibilities_to_count):
     snps = []
     for snp_tuple in snp_possibilities_to_count:
         if snp_possibilities_to_count[snp_tuple] >= CONSENSUS_MAJORITY:
+            print(snp_possibilities_to_count[snp_tuple])
             snps.append(list(snp_tuple))
+    # snps.sort(key= lambda x:(snp_possibilities_to_count[tuple(x)]))
     return snps
 
 def find_snps(reads, lookup, ref):
@@ -96,8 +98,10 @@ def find_snps(reads, lookup, ref):
     for read in reads:
         possible_snps += find_possible_snp_in_read(read, lookup, ref)
 
+    print(len(possible_snps))
     snp_possibilities_to_count = count_occurences_possible_snps(possible_snps)
     snps = choose_majority_snps(snp_possibilities_to_count)
+    snps.sort(key=lambda x:x[2])
 
     return snps
 
@@ -116,6 +120,41 @@ def enumerate_reads(reads):
 def convert_pairs_to_reads(paired_reads):
     return [read for read_pair in paired_reads for read in read_pair]
 
+def should_compare_positions(first, third, ideal):
+    return (third - first == (ideal + 1)) or (third - first == (ideal - 1))
+
+def find_compare_positions(possible_first_pos, possible_third_pos):
+    ideal_pos_diff = int(L*2/3)
+    # num_comparisons = min(len(possible_first_pos), len(possible_third_pos))
+    compare_positions = []
+    # first_pos = 0
+    # third_pos = 0
+    for i in range(len(possible_first_pos)):
+        for j in range(len(possible_third_pos)):
+            if possible_third_pos[j] - possible_first_pos[i] == ideal_pos_diff:
+                return []
+            elif should_compare_positions(possible_first_pos[i], possible_third_pos[j], ideal_pos_diff):
+                return [possible_first_pos[i] + int(L/3)]
+        # first_pos += 1
+        # third_pos += 1
+    return compare_positions
+
+def find_insertions_deletions_in_read(read, lookup, ref):
+    thirds = split_into_3(read)
+    dels = []
+    if thirds[0] in lookup and thirds[2] in lookup:
+        possible_first_pos = lookup[thirds[0]]
+        possible_third_pos = lookup[thirds[2]]
+        compare_positions = find_compare_positions(possible_first_pos, possible_third_pos)
+
+    return dels
+
+def find_ins_dels(reads, lookup, ref):
+    possible_ins = []
+    possible_dels = []
+    for read in reads:
+        possible_deletions += find_insertions_deletions_in_read(read, lookup, ref)
+    return possible_ins, possible_dels
 
 def parse_reads_file(reads_fn):
     """
@@ -144,6 +183,36 @@ def parse_reads_file(reads_fn):
         print("Could not read file: ", reads_fn)
         return None
 
+def write_lookup(lookup):
+    file = open("lookup.txt", 'w')
+    for key in lookup:
+        file.write(key+"\n")
+        [file.write(str(val) + " ") for val in lookup[key]]
+        file.write("\n")
+
+def read_lookup():
+    file = open("lookup.txt", 'r')
+    lookup = {}
+    for key in file:
+        lookup[key[:-1]] = [int(val) for val in next(file).split()]
+    return lookup
+
+def write_reads(reads):
+    file = open("parsed_reads.txt", 'w')
+    for read in reads:
+        file.write(read + "\n")
+
+def read_reads():
+    file = open("parsed_reads.txt", 'r')
+    reads = []
+    for read in file:
+        reads.append(read[:-1])
+    return reads
+
+def write_snps(snps):
+    file = open("snps.txt", 'w')
+    for x in snps:
+        file.write(','.join([str(u) for u in x]) + '\n')
 
 def parse_ref_file(ref_fn):
     """
@@ -195,11 +264,16 @@ if __name__ == "__main__":
         sys.exit(1)
 
     lookup = create_subsequence_lookup(reference)
+    # write_lookup(lookup)
+    # lookup = read_lookup()
     reads = convert_pairs_to_reads(input_reads)
     reduced_size_reads = enumerate_reads(reads)
+    # write_reads(reduced_size_reads)
+    # reduced_size_reads = read_reads()
     snps = find_snps(reduced_size_reads, lookup, reference)
-    insertions = [['ACGTA', 12434]]
-    deletions = [['CACGG', 12]]
+    # write_snps(snps)
+    insertions = [['A', 12434]]
+    deletions = [['C', 12]]
 
     output_fn = args.output_file
     zip_fn = output_fn + '.zip'
