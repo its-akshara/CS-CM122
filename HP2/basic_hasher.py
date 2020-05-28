@@ -6,7 +6,7 @@ import zipfile
 
 L = 30
 MISMATCHES_ALLOWED = 2 # Number of mismatches allowed
-CONSENSUS_MAJORITY = 190 # Number to get consensus that SNP located there
+CONSENSUS_MAJORITY = 175 # Number to get consensus that SNP located there
 
 def create_subsequence_lookup(genome):
     subseq_to_index = {}
@@ -82,19 +82,31 @@ def count_occurences_possible_snps(snps):
 
     return snp_pos_to_count
 
-def choose_majority_snps(snp_possibilities_to_count):
-    snps = []
-    avg = 0
-    for snp_tuple in snp_possibilities_to_count:
-        if snp_possibilities_to_count[snp_tuple] >= CONSENSUS_MAJORITY:
-            print(snp_possibilities_to_count[snp_tuple])
-            snps.append(list(snp_tuple))
-            avg += snp_possibilities_to_count[snp_tuple]
-    snps.sort(key= lambda x:(snp_possibilities_to_count[tuple(x)]))
-    print("AVG={}".format(avg/len(snps)))
-    # if len(snps) > 300:
-    #     return snps[:300]
-    return snps
+def choose_majority(possibilities_to_count, majority):
+    diffs = []
+    # avg = 0
+    for diff_tuple in possibilities_to_count:
+        if possibilities_to_count[diff_tuple] >= majority:
+            # print(possibilities_to_count[diff_tuple])
+            diffs.append(list(diff_tuple))
+            # avg += possibilities_to_count[diff_tuple]
+    # print("AVG={}".format(avg/len(diffs)))
+    return diffs
+
+def remove_pos_duplicates(sorted_snps, snp_possibilities_to_count):
+    pos_to_snp = {}
+    final_snps = []
+    for snp in sorted_snps:
+        if snp[2] in pos_to_snp:
+            prev_snp = (pos_to_snp[snp[2]][0], pos_to_snp[snp[2]][1], snp[2])
+            prev_count = snp_possibilities_to_count[prev_snp]
+            if prev_count < snp_possibilities_to_count[tuple(snp)]:
+                final_snps.pop()
+            else:
+                continue
+        pos_to_snp[snp[2]] = (snp[0], snp[1])
+        final_snps.append(snp)
+    return final_snps
 
 def find_snps(reads, lookup, ref):
     possible_snps = []
@@ -103,12 +115,11 @@ def find_snps(reads, lookup, ref):
     for read in reads:
         possible_snps += find_possible_snp_in_read(read, lookup, ref)
 
-    print(len(possible_snps))
     snp_possibilities_to_count = count_occurences_possible_snps(possible_snps)
-    snps = choose_majority_snps(snp_possibilities_to_count)
+    snps = choose_majority(snp_possibilities_to_count, CONSENSUS_MAJORITY)
     snps.sort(key=lambda x:x[2])
 
-    return snps
+    return remove_pos_duplicates(snps, snp_possibilities_to_count)
 
 def kmer_comp(read):
     kmers = []
@@ -136,10 +147,7 @@ DEL = "DEL"
 
 def find_compare_positions(possible_first_pos, possible_third_pos):
     ideal_pos_diff = int(L*2/3)
-    # num_comparisons = min(len(possible_first_pos), len(possible_third_pos))
     compare_positions = []
-    # first_pos = 0
-    # third_pos = 0
     for i in range(len(possible_first_pos)):
         for j in range(len(possible_third_pos)):
             if possible_third_pos[j] - possible_first_pos[i] == ideal_pos_diff:
@@ -148,27 +156,23 @@ def find_compare_positions(possible_first_pos, possible_third_pos):
                 return [(possible_first_pos[i] + int(L/3), INS)]
             elif is_possible_del(possible_first_pos[i], possible_third_pos[j], ideal_pos_diff):
                 return [(possible_first_pos[i] + int(L/3), DEL)]
-        # first_pos += 1
-        # third_pos += 1
     return compare_positions
 
 def compare_insertion(ref,read_third,start_pos):
     diff = []
-    print(start_pos)
     num_compares = min(len(ref), len(read_third))
     for i in range(num_compares):
         if ref[i] != read_third[i]:
-            diff.append((read_third[i], start_pos + i - 1))
+            diff.append([read_third[i], start_pos + i])
             break
     return diff
 
 def compare_deletion(ref,read_third,start_pos):
     diff = []
-    print(start_pos)
     num_compares = min(len(ref), len(read_third))
     for i in range(num_compares):
         if ref[i] != read_third[i]:
-            diff.append((ref[i], start_pos + i - 1))
+            diff.append([ref[i], start_pos + i])
             break
     return diff
 
@@ -207,7 +211,13 @@ def find_ins_dels(reads, lookup, ref):
             possible_ins += insertions
         if len(deletions) > 0:
             possible_dels += deletions
-    return possible_ins, possible_dels
+
+    insertions_to_count = count_occurences_possible_snps(possible_ins)
+    deletions_to_count = count_occurences_possible_snps(possible_dels)
+
+    ins = choose_majority(insertions_to_count, 10)
+    dels = choose_majority(deletions_to_count, 10)
+    return ins, dels
 
 def parse_reads_file(reads_fn):
     """
@@ -316,19 +326,20 @@ if __name__ == "__main__":
     if reference is None:
         sys.exit(1)
 
-    # lookup = create_subsequence_lookup(reference)
+    lookup = create_subsequence_lookup(reference)
     # write_lookup(lookup)
-    lookup = read_lookup()
+    # lookup = read_lookup()
     reads = convert_pairs_to_reads(input_reads)
-    # reduced_size_reads = enumerate_reads(reads)
-    reduced_size_reads = reads
+    reduced_size_reads = enumerate_reads(reads)
+    # reads = read_reads()
     # write_reads(reduced_size_reads)
-    reduced_size_reads = read_reads()
-    snps = find_snps(reduced_size_reads, lookup, reference)
-    write_snps(snps)
-    insertions = [['A', 12434]]
-    deletions = [['C', 12]]
-
+    snps = find_snps(reads, lookup, reference)
+    # write_snps(snps)
+    insertions, deletions = find_ins_dels(reduced_size_reads, lookup, reference)
+    insertions.sort(key= lambda x:x[1])
+    deletions.sort(key= lambda x:x[1])
+    # insertions = []
+    # deletions = []
     output_fn = args.output_file
     zip_fn = output_fn + '.zip'
     with open(output_fn, 'w') as output_file:
